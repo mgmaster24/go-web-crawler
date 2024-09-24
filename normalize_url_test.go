@@ -20,7 +20,7 @@ func TestNormalizeURL(t *testing.T) {
 
 	for i, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := NormalizeURL(tc.inputURL)
+			actual, err := normalizeURL(tc.inputURL)
 			if err != nil {
 				t.Errorf("Test %v - '%s' FAIL: unexpected error: %v", i, tc.name, err)
 				return
@@ -33,6 +33,90 @@ func TestNormalizeURL(t *testing.T) {
 					tc.expected,
 					actual,
 				)
+			}
+		})
+	}
+}
+
+func TestGetUrls(t *testing.T) {
+	tests := []struct {
+		name      string
+		inputURL  string
+		inputBody string
+		expected  []string
+	}{
+		{
+			name:     "absolute and relative path",
+			inputURL: "https://blog.boot.dev",
+			inputBody: `
+<html>
+	<body>
+		<a href="/path/one">
+			<span>Boot.dev</span>
+		</a>
+		<a href="https://other.com/path/one">
+			<span>Boot.dev</span>
+		</a>
+	</body>
+</html>
+`,
+			expected: []string{"https://blog.boot.dev/path/one", "https://other.com/path/one"},
+		},
+		{
+			name:     "No urls",
+			inputURL: "https://blog.boot.dev",
+			inputBody: `
+<html>
+	<body>
+		<span>Boot.dev</span>
+		<span>Boot.dev</span>
+	</body>
+</html>
+`,
+		},
+		{
+			name:     "absolute and relative path - no children",
+			inputURL: "https://blog.boot.dev",
+			inputBody: `
+<html>
+	<body>
+		<a href="/path/one"></a>
+		<a href="https://other.com/path/one"></a>
+	</body>
+</html>
+`,
+			expected: []string{"https://blog.boot.dev/path/one", "https://other.com/path/one"},
+		},
+	}
+
+	for i, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := getURLsFromHTML(tc.inputBody, tc.inputURL)
+			if err != nil {
+				t.Errorf("Test %v - '%s' FAIL: unexpected error: %v", i, tc.name, err)
+			}
+
+			if len(actual) != len(tc.expected) {
+				t.Errorf(
+					"Test %v - '%s' FAIL: The number of expected URLS does not match the number returned, expected (%d), actual (%d)",
+					i,
+					tc.name,
+					len(tc.expected),
+					len(actual),
+				)
+			}
+
+			for i, expectedURL := range tc.expected {
+				actualURL := actual[i]
+				if expectedURL != actualURL {
+					t.Errorf(
+						"Test %v = '%s' FAIL: The expected URL (%v) does not match the actual URL (%v)",
+						i,
+						tc.name,
+						expectedURL,
+						actualURL,
+					)
+				}
 			}
 		})
 	}
