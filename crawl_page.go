@@ -6,6 +6,12 @@ import (
 )
 
 func (cfg *config) crawlPage(rawCurrentURL string) {
+  cfg.concurrencyControl <- struct{}{}
+	defer func() {
+		<-cfg.concurrencyControl
+		cfg.wg.Done()
+	}()
+
 	currentURL, err := url.Parse(rawCurrentURL)
 	if err != nil {
 		fmt.Printf("Error - crawlPage: couldn't parse URL '%s': %v\n", rawCurrentURL, err)
@@ -22,27 +28,27 @@ func (cfg *config) crawlPage(rawCurrentURL string) {
 		return
 	}
 
-	if _, visited := cfg.pages[normalizedCurrURL]; visited {
-		cfg.pages[normalizedCurrURL]++
-		return
-	}
-
-	cfg.pages[normalizedCurrURL] = 1
+  isFirst := cfg.addPageVisit(normalizedCurrURL)
+  if !isFirst {
+    return
+  }
 
 	fmt.Printf("crawling %s\n", rawCurrentURL)
 	currentRawHTML, err := getHTML(rawCurrentURL)
 	if err != nil {
 		fmt.Printf("Error - getHTML: %v", err)
-		return
-	}
+    return
+  }
 
 	urls, err := getURLsFromHTML(currentRawHTML, cfg.baseURL)
 	if err != nil {
 		fmt.Printf("Error - getURLsFromHTML: %v\n", err)
-		return
+    return
 	}
 
 	for _, url := range urls {
-		cfg.crawlPage(url)
-	}
+		cfg.wg.Add(1)
+    go cfg.crawlPage(url)
+  }
 }
+
